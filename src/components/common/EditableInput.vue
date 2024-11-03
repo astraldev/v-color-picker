@@ -1,114 +1,130 @@
 <template>
-  <div class="vc-editable-input">
-    <input
-      :aria-labelledby="labelId"
-      class="vc-input__input"
-      v-model="val"
-      @keydown="handleKeyDown"
-      @input="update"
-      ref="input"
+  <label
+    class="vc-editable-input-wrapper"
+    :class="wrapperClass"
+  >
+    <span
+      v-if="label"
+      class="vc-editable-input-label"
     >
-    <span :for="label" class="vc-input__label" :id="labelId">{{labelSpanText}}</span>
-    <span class="vc-input__desc">{{desc}}</span>
-  </div>
+      {{ label }}
+    </span>
+    <input
+      :aria-labelledby="ariaId"
+      class="vc-editable-input"
+      v-model="inputValue"
+      v-bind="{ ...inputSettings, ...$attrs}"
+      @change="validate"
+    >    
+  </label>
 </template>
 
-<script>
-export default {
-  name: 'editableInput',
-  props: {
-    label: String,
-    labelText: String,
-    desc: String,
-    modelValue: [String, Number],
-    max: Number,
-    min: Number,
-    arrowOffset: {
-      type: Number,
-      default: 1
-    }
-  },
-  computed: {
-    val: {
-      get () {
-        return this.modelValue
-      },
-      set (v) {
-        // TODO: min
-        if (!(this.max === undefined) && +v > this.max) {
-          this.$refs.input.value = this.max
-        } else {
-          return v
-        }
-      }
-    },
-    labelId () {
-      return `input__label__${this.label}__${Math.random().toString().slice(2, 5)}`
-    },
-    labelSpanText () {
-      return this.labelText || this.label
-    }
-  },
-  methods: {
-    update (e) {
-      this.handleChange(e.target.value)
-    },
-    handleChange (newVal) {
-      const data = {}
-      data[this.label] = newVal
-      if (data.hex === undefined && data['#'] === undefined) {
-        this.$emit('change', data)
-      } else if (newVal.length > 5) {
-        this.$emit('change', data)
-      }
-    },
-    // **** unused
-    // handleBlur (e) {
-    //   console.log(e)
-    // },
-    handleKeyDown (e) {
-      let val = this.val
-      const number = Number(val)
+<script lang="ts" setup>
+import { InputHTMLAttributes } from 'vue';
 
-      if (number) {
-        const amount = this.arrowOffset || 1
+const ariaId = useId();
+type ColorInputs = "hex" | "hex3" | "hex8" | "hex4" | "hsla" | "rgba" | "none" | "hue";
 
-        // Up
-        if (e.keyCode === 38) {
-          val = number + amount
-          this.handleChange(val)
-          e.preventDefault()
-        }
+defineOptions({ inheritAttrs: false });
+const emit = defineEmits(["update:model-value"]);
 
-        // Down
-        if (e.keyCode === 40) {
-          val = number - amount
-          this.handleChange(val)
-          e.preventDefault()
-        }
-      }
-    }
-    // **** unused
-    // handleDrag (e) {
-    //   console.log(e)
-    // },
-    // handleMouseDown (e) {
-    //   console.log(e)
-    // }
+const options = withDefaults(
+  defineProps<{
+    modelValue?: number | string | null;
+    type?: ColorInputs;
+    label?: string;
+    wrapperClass?: string; 
+  }>(),
+  {
+    modelValue: undefined,
+    type: "none",
+    label: undefined,
+    wrapperClass: "",
   }
-}
+);
+
+const { modelValue, type } = toRefs(options);
+
+const inputValue = ref(modelValue.value);
+
+const inputSettings = computed((): InputHTMLAttributes => {
+  const defaults: InputHTMLAttributes = { type: typeof modelValue.value === "number" ? "number" : "text" };
+  if (type.value === "hue") {
+    return { ...defaults, max: 360, min: 0 };
+  } else if (type.value === "hsla") {
+    return { ...defaults, max: 100, min: 0, };
+  } else if (type.value === "rgba") {
+    return { ...defaults, min: 0, max: 255 };
+  } else if (type.value in ["hex", "hex3", "hex4", "hex8"]) {
+    return { ...defaults, type: "text" };
+  } else return { ...defaults };
+});
+
+const parseResults = (value: string | number | undefined | null) => {
+  if (value === undefined || value === null) return value;
+  const intValue = parseInt(value.toString());
+  
+  if (Number.isNaN(intValue) && (type.value !== "none" && type.value !== "hex"))
+    return modelValue.value;
+  
+  if (type.value === "hsla") return clamp(intValue, 0, 100);
+  if (type.value === "rgba") return clamp(intValue, 0, 255);
+  return value;
+};
+
+const validate = async (nv: Event) => {
+  await nextTick();
+  const value = (nv.target as HTMLInputElement | null)?.value;
+  if (parseResults(value) !== inputValue.value) {
+    inputValue.value = parseResults(value);
+  }
+};
+
+watch(
+  inputValue,
+  (n, old) => {
+    const res = parseResults(n);
+    if (old === n) return;
+    inputValue.value = res;
+    if (res) {
+      if (type.value === "hex" && !isValidHex(res.toString(), 6)) return;
+      if (type.value === "hex3" && !isValidHex(res.toString(), 3)) return;
+      if (type.value === "hex4" && !isValidHex(res.toString(), 4)) return;
+      if (type.value === "hex8" && !isValidHex(res.toString(), 8)) return;
+    }
+    emit('update:model-value', res);
+  },
+);
+
+watch(
+  modelValue,
+  (newValue) => {
+    if (newValue != inputValue.value) {
+      inputValue.value = parseResults(newValue);
+    }
+  },
+  { immediate: true },
+);
+
 </script>
 
-<style lang="css">
+<style lang="scss" scoped>
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 .vc-editable-input {
-  position: relative;
+  @apply p-1 w-full min-w-[calc(4ex_+_8px)] h-full appearance-none bg-transparent;
+  outline: none !important;
 }
-.vc-input__input {
-  padding: 0;
-  border: 0;
-  outline: none;
+
+.vc-editable-input-label {
+  @apply py-1 px-2 w-fit h-full bg-white/[0.035] grid place-items-center;
 }
-.vc-input__label {
-  text-transform: capitalize;
+
+.vc-editable-input-wrapper {
+  @apply inline-flex items-center w-fit rounded overflow-clip;
 }
 </style>
