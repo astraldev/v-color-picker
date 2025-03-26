@@ -13,7 +13,7 @@
       :aria-labelledby="ariaId"
       class="vc-editable-input"
       v-model="inputValue"
-      v-bind="{ ...inputSettings, ...$attrs}"
+      v-bind="{ ...inputSettings, ...$attrs }"
       @change="validate"
     >    
   </label>

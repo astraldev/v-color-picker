@@ -1,22 +1,20 @@
 <script setup lang="ts">
 import Chrome from './components/Chrome.vue';
-import Checkboard from './components/common/Checkboard.vue';
-import EditableInput from './components/common/EditableInput.vue';
-import Compact from './components/Compact.vue';
-import Material from './components/Material.vue';
-import Slider from './components/Slider.vue';
-import Twitter from './components/Twitter.vue';
+import PercentageSlider2d from './components/common/PercentageSlider2d.vue';
 
 const color = ref("red");
+
+const x = ref(50);
+const y = ref(0);
+
 </script>
 
 <template>
   <div class="hue-test">
     {{ color }}
-
     <Chrome v-model:color="color" />
 
-    <button @click="color = 'red'">
+    <!-- <button @click="color = 'red'">
       Set to red
     </button>
 
@@ -26,7 +24,7 @@ const color = ref("red");
 
     <button @click="color = 'blue'">
       Set to blue
-    </button>
+    </button> -->
   </div>
 </template>
 

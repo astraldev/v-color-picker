@@ -1,18 +1,18 @@
 <template>
   <div
-    class="vc-percentage-slider"
-    :class="`vc-percentage-slider--${orientation} vc-percentage-slider-${mode}`"
+    class="vc-slider"
+    :class="`vc-slider--${orientation} vc-slider-${mode}`"
   >
     <div
-      class="vc-percentage-slider-container"
+      class="vc-slider-container"
       role="slider"
       aria-valuemin="0"
-      aria-valuemax="360"
+      :aria-valuemax="inRange"
       ref="containerEl"
       @click="sliding(true)"
     >
       <div
-        class="vc-percentage-slider-pointer"
+        class="vc-slider-pointer"
         role="presentation"
         ref="pointerEl"
         :style="{ left: `${offset.x}%`, top: `${offset.y}%` }"
@@ -82,6 +82,7 @@ const update = (value: number) => {
   const valueInBound = inRange.value * (value / 100);
   emit("update:percentage", valueInBound);
 };
+
 onClickOutside(containerEl, slidingStop);
 
 watch(
@@ -108,7 +109,7 @@ watch(
 </script>
 
 <style lang="scss">
-.vc-percentage-slider {
+.vc-slider {
   position: relative;
 
   &, &-container {
@@ -117,34 +118,30 @@ watch(
   }
 
   &--horizontal {
-    .vc-percentage-slider-pointer {
+    .vc-slider-pointer {
       height: 100%;
       width: 3px;
     }
   }
   
   &--vertical {
-    .vc-percentage-slider-pointer {
+    .vc-slider-pointer {
       width: 100%;
       height: 3px;
     }
   }
 
-  &--saturation {
-    
-  }
-
   &:hover {
-    .vc-percentage-slider-pointer {
+    .vc-slider-pointer {
       transform: scale(1.15);
     }
   }
 }
 
-.vc-percentage-slider-pointer {
+.vc-slider-pointer {
   position: absolute;
   padding: 0;
   transition: transform 150ms ease-out;
-  background-color: var(--vc-percentage-slider-pointer-background, #fff);
+  background-color: var(--vc-slider-pointer-background, #fff);
 }
 </style>

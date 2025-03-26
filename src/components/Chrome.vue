@@ -9,7 +9,16 @@
     }"
   >
     <div class="vc-chrome-saturation-wrap">
-      <!-- <PercentageSlider v-model="saturation" /> -->
+      <PercentageSlider2d
+        v-model:x="hsva.s"
+        v-model:y="hsva.v"
+        :x-in-range="1"
+        :y-in-range="1"
+        with-hsv-brightness
+        with-hsv-saturation
+        :style="{ background: `hsl(${hsva.h}, 100%, 50%)`}"
+        invert-y
+      />
     </div>
     <div class="vc-chrome-body">
       <div class="vc-chrome-controls">
@@ -17,9 +26,12 @@
           <div
             :aria-label="`current color is #${hex}`"
             class="vc-chrome-active-color"
-            :style="{ background: `${getColorAs('hsl')}` }"
+            :style="{ background: `#${hex8}` }"
           />
-          <Checkboard v-if="!disableAlpha" />
+          <Checkboard
+            class="checkerboard rounded-full"
+            v-if="!disableAlpha"
+          />
         </div>
 
         <div class="vc-chrome-sliders">
@@ -47,7 +59,7 @@
       >
         <div
           class="vc-chrome-fields"
-          v-show="fieldsIndex === 0"
+          v-show="activeColorOption.value === 0"
         >
           <!-- hex -->
           <div class="vc-chrome-field">
@@ -66,8 +78,8 @@
           </div>
         </div>
         <div
-          class="vc-chrome-fields"
-          v-show="fieldsIndex === 1"
+          class="vc-chrome-fields vc-chrome-fields-rgba"
+          v-show="activeColorOption.value === 1"
         >
           <!-- rgba -->
           <div class="vc-chrome-field">
@@ -94,14 +106,16 @@
           >
             <EditableInput
               label="a"
-              v-model="alpha"
+              v-model.number="alpha"
               :in-range="1"
+              :step="0.05"
+              :max="1"
             />
           </div>
         </div>
         <div
-          class="vc-chrome-fields"
-          v-show="fieldsIndex === 2"
+          class="vc-chrome-fields vc-chrome-fields-hsla"
+          v-show="activeColorOption.value === 2"
         >
           <!-- hsla -->
           <div class="vc-chrome-field">
@@ -131,28 +145,34 @@
           >
             <EditableInput
               label="a"
-              v-model="alpha"
+              v-model.number="alpha"
+              :step="0.05"
               :max="1"
             />
           </div>
         </div>
         <!-- btn -->
-        <div
-          class="vc-chrome-toggle-btn"
-          role="button"
-          aria-label="Change another color definition"
-          @click="incrementView"
+        <OptionSelect
+          v-model:active-option="activeColorOption"
+          :options="colorTypeOptions"
+          class="mt-auto !pb-2"
         >
-          +
-        </div>
-        <div
-          class="vc-chrome-toggle-btn"
-          role="button"
-          aria-label="Change another color definition"
-          @click="decrementView"
-        >
-          -
-        </div>
+          <svg
+            class="h-4 w-4"
+            version="1.1"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="m5.6948 14.123c-0.39052 0.3905-0.39052 1.0237 0 1.4142l4.8922 4.8874c0.7812 0.7804 2.047 0.7801 2.8278-6e-4l4.8903-4.8904c0.3906-0.3905 0.3906-1.0237 0-1.4142-0.3905-0.3905-1.0237-0.3905-1.4142 0l-4.1856 4.1856c-0.3905 0.3906-1.0237 0.3906-1.4142 0l-4.1821-4.182c-0.39052-0.3905-1.0237-0.3905-1.4142 0z"
+              fill="currentColor"
+            />
+            <path
+              d="m18.305 9.9908c0.3906-0.39052 0.3906-1.0237 0-1.4142l-4.8922-4.8874c-0.7812-0.78039-2.0469-0.78008-2.8277 7e-4l-4.8904 4.8904c-0.39053 0.39052-0.39053 1.0237 0 1.4142 0.39052 0.39053 1.0237 0.39053 1.4142 0l4.1857-4.1856c0.3905-0.39053 1.0237-0.39053 1.4142 0l4.182 4.182c0.3905 0.39053 1.0237 0.39053 1.4142 0z"
+              fill="currentColor"
+            />
+          </svg>
+        </OptionSelect>
         <!-- btn -->
       </div>
     </div>
@@ -163,7 +183,9 @@
 import { ColorFormat } from '../composables/useColor';
 import Checkboard from './common/Checkboard.vue';
 import EditableInput from './common/EditableInput.vue';
+import OptionSelect from './common/OptionSelect.vue';
 import PercentageSlider from './common/PercentageSlider.vue';
+import PercentageSlider2d from './common/PercentageSlider2d.vue';
 
 const emit = defineEmits(["update:color"]);
 const options = withDefaults(
@@ -184,6 +206,7 @@ const {
   red,
   green,
   blue,
+  hsva,
   hue,
   hex8,
   saturation,
@@ -191,255 +214,87 @@ const {
   alpha,
   alphaGradient,
   hueGradient,
-  getColorAs,
 } = useColor(
   color,
   (nc) => emit("update:color", nc)
 );
 
+const colorTypeOptions = computed(() => {
+  return ["HEX", "RGBA", "HSLA"].map((val, idx) => ({ value: idx, label: val }));
+});
 
-// ["hex", "rgba", "hsla"];
-const fieldsIndex = ref(0);
-
-const incrementView = () => {
-  fieldsIndex.value = fieldsIndex.value >= 2 ? 0 : fieldsIndex.value + 1;
-};
-
-const decrementView = () => {
-  fieldsIndex.value = fieldsIndex.value < 1 ? 2 : fieldsIndex.value - 1;
-};
-
-// export default {
-//   name: 'Chrome',
-//   mixins: [colorMixin],
-//   props: {
-//     disableAlpha: {
-//       type: Boolean,
-//       default: false
-//     },
-//     disableFields: {
-//       type: Boolean,
-//       default: false
-//     }
-//   },
-//   components: {
-//     saturation,
-//     hue,
-//     alpha,
-//     'EditableInput': editableInput,
-//     checkboard
-//   },
-//   data () {
-//     return {
-//       fieldsIndex: 0,
-//       highlight: false
-//     };
-//   },
-//   computed: {
-//     hsl () {
-//       const { h, s, l } = this.colors.hsl;
-//       return {
-//         h: h.toFixed(),
-//         s: `${(s * 100).toFixed()}%`,
-//         l: `${(l * 100).toFixed()}%`
-//       };
-//     },
-//     activeColor () {
-//       const rgba = this.colors.rgba;
-//       return 'rgba(' + [rgba.r, rgba.g, rgba.b, rgba.a].join(',') + ')';
-//     },
-//     hasAlpha () {
-//       return this.colors.a < 1;
-//     }
-//   },
-//   methods: {
-//     childChange (data) {
-//       this.colorChange(data);
-//     },
-//     inputChange (data) {
-//       if (!data) {
-//         return;
-//       }
-//       if (data.hex) {
-//         this.isValidHex(data.hex) && this.colorChange({
-//           hex: data.hex,
-//           source: 'hex'
-//         });
-//       } else if (data.r || data.g || data.b || data.a) {
-//         this.colorChange({
-//           r: data.r || this.colors.rgba.r,
-//           g: data.g || this.colors.rgba.g,
-//           b: data.b || this.colors.rgba.b,
-//           a: data.a || this.colors.rgba.a,
-//           source: 'rgba'
-//         });
-//       } else if (data.h || data.s || data.l) {
-//         const s = data.s ? (data.s.replace('%', '') / 100) : this.colors.hsl.s;
-//         const l = data.l ? (data.l.replace('%', '') / 100) : this.colors.hsl.l;
-
-//         this.colorChange({
-//           h: data.h || this.colors.hsl.h,
-//           s,
-//           l,
-//           source: 'hsl'
-//         });
-//       }
-//     },
-//     toggleViews () {
-//       if (this.fieldsIndex >= 2) {
-//         this.fieldsIndex = 0;
-//         return;
-//       }
-//       this.fieldsIndex++;
-//     },
-//     showHighlight () {
-//       this.highlight = true;
-//     },
-//     hideHighlight () {
-//       this.highlight = false;
-//     }
-//   }
-// };
+const activeColorOption = ref(colorTypeOptions.value[0]);
 </script>
 
-<style lang="css">
+<style lang="scss" scoped>
 .vc-chrome {
-  /* background: #fff; */
-  border-radius: 2px;
-  box-shadow: 0 0 2px rgba(0,0,0,.3), 0 4px 8px rgba(0,0,0,.3);
-  box-sizing: initial;
-  width: 225px;
-  font-family: Menlo;
-  /* background-color: #fff; */
-}
-.vc-chrome-controls {
-  display: flex;
-}
-.vc-chrome-color-wrap {
-  position: relative;
-  width: 36px;
-}
-.vc-chrome-active-color {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: 15px;
-  overflow: hidden;
-  z-index: 1;
-}
-.vc-chrome-color-wrap .vc-checkerboard {
-  width: 30px;
-  height: 30px;
-  border-radius: 15px;
-  background-size: auto;
-}
-.vc-chrome-sliders {
-  flex: 1;
-}
-.vc-chrome-fields-wrap {
-  display: flex;
-  padding-top: 16px;
-}
-.vc-chrome-fields {
-  display: flex;
-  margin-left: -6px;
-  flex: 1;
-}
-.vc-chrome-field {
-  padding-left: 6px;
-  width: 100%;
-}
-.vc-chrome-toggle-btn {
-  width: 32px;
-  text-align: right;
-  position: relative;
-}
-.vc-chrome-toggle-icon {
-  margin-right: -4px;
-  margin-top: 12px;
-  cursor: pointer;
-  position: relative;
-  z-index: 2;
-}
-.vc-chrome-toggle-icon-highlight {
-  position: absolute;
-  width: 24px;
-  height: 28px;
-  /* background: #eee; */
-  border-radius: 4px;
-  top: 10px;
-  left: 12px;
-}
-.vc-chrome-hue-wrap {
-  position: relative;
-  height: 10px;
-  margin-bottom: 8px;
-  background: var(--vc-hue-gradient-horizontal, white);
-}
-.vc-chrome-alpha-wrap {
-  position: relative;
-  height: 10px;
-  background: var(--vc-alpha-gradient, white);
-}
-.vc-chrome-hue-wrap .vc-hue {
-  border-radius: 2px;
-}
-.vc-chrome-alpha-wrap .vc-alpha-gradient {
-  border-radius: 2px;
-}
-.vc-chrome-hue-wrap .vc-hue-picker, .vc-chrome-alpha-wrap .vc-alpha-picker {
-  width: 12px;
-  height: 12px;
-  border-radius: 6px;
-  transform: translate(-6px, -2px);
-  background-color: rgb(248, 248, 248);
-  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.37);
-}
-.vc-chrome-body {
-  padding: 16px 16px 12px;
-  /* background-color: #fff; */
-}
-.vc-chrome-saturation-wrap {
-  width: 100%;
-  padding-bottom: 55%;
-  position: relative;
-  border-radius: 2px 2px 0 0;
-  overflow: hidden;
-}
-.vc-chrome-saturation-wrap .vc-saturation-circle {
-  width: 12px;
-  height: 12px;
-}
+  @apply flex flex-col border rounded-lg border-white/10;
+  --vc-slider-2d-width: 100%;
+  --vc-slider-2d-height: 100%;
+  --vc-slider-2d-roundness: 0;
 
-.vc-chrome-fields .vc-input__input {
-  font-size: 11px;
-  color: #333;
-  width: 100%;
-  border-radius: 2px;
-  border: none;
-  box-shadow: inset 0 0 0 1px #dadada;
-  height: 21px;
-  text-align: center;
-}
-.vc-chrome-fields .vc-input__label {
-  text-transform: uppercase;
-  font-size: 11px;
-  line-height: 11px;
-  color: #969696;
-  text-align: center;
-  display: block;
-  margin-top: 12px;
-}
+  &-saturation-wrap {
+    @apply flex-grow h-40;
+  }
 
-.vc-chrome__disable-alpha .vc-chrome-active-color {
-  width: 18px;
-  height: 18px;
-}
-.vc-chrome__disable-alpha .vc-chrome-color-wrap {
-  width: 30px;
-}
-.vc-chrome__disable-alpha .vc-chrome-hue-wrap {
-  margin-top: 4px;
-  margin-bottom: 4px;
+  &-controls {
+    @apply flex gap-x-4 p-2;
+  }
+
+  &-active-color {
+    @apply h-full w-full;
+  }
+
+  .checkerboard {
+    @apply z-[-1] inset-px;
+  }
+
+  &-color-wrap {
+    @apply h-9 w-9 aspect-square rounded-full relative overflow-clip;
+
+    .checkerboard {
+      @apply rounded-full;
+    }
+  }
+
+  &-fields-rgba,
+  &-fields-hsla {
+    @apply flex;
+
+    .vc-chrome-field:not(:last-child) {
+      :deep(.vc-editable-input-label) {
+        @apply border-r border-white/10;
+      }
+    }
+
+    :deep(.vc-editable-input-label) {
+      @apply w-full text-center font-medium font-mono;
+    }
+    
+    :deep(.vc-editable-input-wrapper) {
+      @apply flex-col-reverse gap-y-0.5 rounded-none;
+    }
+
+    :deep(.vc-editable-input) {
+      @apply w-[calc(5ex_+_8px)] text-center font-medium text-sm;
+    }
+  }
+
+  &-fields-wrap {
+    @apply flex p-2;
+  }
+
+  &-sliders {
+    @apply flex-grow flex flex-col *:flex-1;
+  }
+
+  &-hue-wrap {
+    background: var(--vc-hue-gradient-horizontal, white);
+  }
+
+  &-alpha-wrap {
+    background: var(--vc-alpha-gradient, white);
+    @apply relative;
+  }
 }
 </style>

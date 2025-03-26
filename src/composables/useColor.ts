@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import tinycolor from "tinycolor2";
 import { isEqual } from "lodash-es";
+import { useDebounceFn } from "@vueuse/core";
 
-export type ColorFormat = 
+export type ColorFormat =
   | string
   | tinycolor.ColorFormats.HSL
   | tinycolor.ColorFormats.HSLA
@@ -18,6 +19,8 @@ const createColorProps = (color: Ref<tinycolor.Instance>) => {
   const hsla = ref(color.value.toHsl());
   const hex = ref(color.value.toHex());
   const hex8 = ref(color.value.toHex8());
+  const hsva = ref(color.value.toHsv());
+  const _setting = ref(false);
 
   const h = computed({
     get: () => hsla.value.h,
@@ -28,11 +31,16 @@ const createColorProps = (color: Ref<tinycolor.Instance>) => {
     get: () => hsla.value.s,
     set: (s) => hsla.value.s = s,
   });
-  
+
   const l = computed({
     get: () => hsla.value.l,
     set: (l) => hsla.value.l = l,
-  });;
+  });
+
+  const v = computed({
+    get: () => hsva.value.v,
+    set: (v) => hsva.value.v = v,
+  });
 
   const red = computed({
     get: () => rgba.value.r,
@@ -48,7 +56,7 @@ const createColorProps = (color: Ref<tinycolor.Instance>) => {
     get: () => rgba.value.b,
     set: (b) => rgba.value.b = b,
   });
-  
+
   const alpha = computed({
     get: () => hsla.value.a,
     set: (a) => hsla.value.a = a,
@@ -63,22 +71,32 @@ const createColorProps = (color: Ref<tinycolor.Instance>) => {
 
   const alphaGradient = computed(() => {
     const rgbStr = [red.value, green.value, blue.value].join(',');
-    return 'linear-gradient(to right, rgba(' + rgbStr + ', 0) 0%, rgba(' + rgbStr + ', 1) 100%)'
+    return 'linear-gradient(to right, rgba(' + rgbStr + ', 0) 0%, rgba(' + rgbStr + ', 1) 100%)';
   });
 
-  const setColors = (color: ColorFormat) => {
-    const _tcolor = tinycolor(color);
-    !isEqual(hex.value, _tcolor.toHex()) && (hex.value = _tcolor.toHex());
-    !isEqual(hex8.value, _tcolor.toHex8()) && (hex8.value = _tcolor.toHex8());
-    !isEqual(hsla.value, _tcolor.toHsl()) && (hsla.value = _tcolor.toHsl());
-    !isEqual(rgba.value, _tcolor.toRgb()) && (rgba.value = _tcolor.toRgb());
-  };
+  const setColors = useDebounceFn(
+    (color: ColorFormat) => {
+      if (_setting.value) return;
+      _setting.value = true;
+
+      const _tcolor = tinycolor(color);
+
+      !isEqual(alpha.value, _tcolor.getAlpha()) && (alpha.value = _tcolor.getAlpha());
+      !isEqual(hex.value, _tcolor.toHex()) && (hex.value = _tcolor.toHex());
+      !isEqual(hex8.value, _tcolor.toHex8()) && (hex8.value = _tcolor.toHex8());
+      !isEqual(hsla.value, _tcolor.toHsl()) && (hsla.value = _tcolor.toHsl());
+      !isEqual(rgba.value, _tcolor.toRgb()) && (rgba.value = _tcolor.toRgb());
+      !isEqual(hsva.value, _tcolor.toHsv()) && (hsva.value = _tcolor.toHsv());
+
+      nextTick(() => (_setting.value = false));
+    }, 10
+  );
 
   watch(
     color,
     (newColor) => {
       if (!newColor) return;
-      setColors(newColor.toHsl());
+      setColors(newColor.toHex8());
     },
     { deep: true },
   );
@@ -95,13 +113,19 @@ const createColorProps = (color: Ref<tinycolor.Instance>) => {
     { deep: true }
   );
 
+  watch(
+    hsva,
+    (hsv) => setColors(hsv),
+    { deep: true }
+  );
+
   watch(hex, (hex) => setColors(hex));
   watch(hex8, (hex8) => setColors(hex8));
 
   return {
-    h, s, l, hex, hex8,
+    h, s, l, v, hex, hex8, hsva,
     hue: h, saturation: s, lightness: l,
-    red, green, blue, 
+    red, green, blue,
     alpha, rgba, hsla,
     alphaGradient,
     hueGradient,
@@ -128,7 +152,7 @@ export const useColor = <T extends MaybeRef<ColorFormat>>(
   const updatedColor = computed(() => {
     const fmt = unref(format);
     const _color = tinycolor(colorProps.hsla.value);
-   
+
     if (typeof initialColor === "string") {
       if (initialColor.startsWith("rgb")) return _color.toRgbString();
       else if (initialColor.startsWith("hsv")) return _color.toHsvString();
@@ -141,11 +165,11 @@ export const useColor = <T extends MaybeRef<ColorFormat>>(
         if (withoutHash.length === 6) return _color.toString("hex6");
         return _color.toString("hex");
       } else {
-        return colorProps.hsla.value.a > 0 
-          ? _color.toString("hex8") 
+        return colorProps.hsla.value.a > 0
+          ? _color.toString("hex8")
           : _color.toString("name");
       }
-    } 
+    }
     else if (isRGBValue(initialColor)) return _color.toRgb();
     else if (isHSLValue(initialColor)) return _color.toHsl();
     else if (isHSVValue(initialColor)) return _color.toHsv();
